@@ -1,0 +1,163 @@
+================================================================================
+YOLO 心臟瓣膜偵測訓練流程總結
+================================================================================
+
+【專案目標】
+使用 MAE 預訓練特徵配合 YOLO 進行心臟瓣膜物體偵測訓練
+
+【資料集】
+來源目錄: /DATA1/yunzhu/SSL/training_image/training_image
+- 訓練集: patient 0001-0030 (30 位患者)
+- 驗證集: patient 0031-0040 (10 位患者)
+
+【核心文件】
+
+1. 資料準備
+   - prepare_yolo_data.py          資料準備腳本
+
+2. 訓練相關
+   - train_valve_yolo.py           YOLO 訓練主腳本
+   - args.yaml                     訓練配置（您的原始配置）
+   - valve_detection.yaml          資料集配置（自動生成）
+
+3. MAE 整合（可選）
+   - mae_yolo_backbone.py          MAE+YOLO 整合模組
+   - mae_valve_output/best_model.pth  預訓練 MAE 模型
+
+4. 執行腳本
+   - run_complete_pipeline.sh      完整流程
+   - run_yolo_training_only.sh     僅 YOLO 訓練
+
+5. 文檔
+   - YOLO_TRAINING_GUIDE.md        完整訓練指南
+   - YOLO_PIPELINE_SUMMARY.txt     本文件
+
+【快速開始】
+
+方法 1: 完整流程（推薦）
+  ./run_complete_pipeline.sh
+
+方法 2: 僅訓練 YOLO
+  # 1. 準備資料
+  python prepare_yolo_data.py
+
+  # 2. 訓練
+  ./run_yolo_training_only.sh
+
+方法 3: 手動執行
+  # 1. 準備資料
+  python prepare_yolo_data.py \
+      --source_dir /DATA1/yunzhu/SSL/training_image/training_image \
+      --output_dir /DATA1/yunzhu/SSL/yolo_dataset
+
+  # 2. 訓練 YOLO
+  python train_valve_yolo.py \
+      --args_yaml /DATA1/yunzhu/SSL/args.yaml \
+      --mae_checkpoint ./mae_valve_output/best_model.pth
+
+【重要提醒】
+
+⚠️  標註文件目前是空的！
+需要手動標註瓣膜位置：
+  1. 使用 LabelImg、CVAT 等工具
+  2. YOLO 格式: class_id x_center y_center width height
+  3. 保存到 yolo_dataset/train/labels/ 和 yolo_dataset/val/labels/
+
+【配置說明】
+
+args.yaml 使用方式:
+- 保留所有原始訓練參數（epochs, batch, model等）
+- 自動更新路徑到當前環境:
+    data    → /DATA1/yunzhu/SSL/valve_detection.yaml
+    project → /DATA1/yunzhu/SSL/valve_training_results
+
+【輸出結果】
+
+訓練輸出:
+  valve_training_results/
+  └── train/
+      ├── weights/
+      │   ├── best.pt     最佳模型
+      │   └── last.pt     最後模型
+      ├── results.png     訓練曲線
+      └── val_batch0_pred.jpg  驗證預測
+
+資料集:
+  yolo_dataset/
+  ├── train/
+  │   ├── images/     ~8,500 張影像 (patient 1-30)
+  │   └── labels/     標註文件
+  ├── val/
+  │   ├── images/     ~2,800 張影像 (patient 31-40)
+  │   └── labels/     標註文件
+  └── valve_detection.yaml
+
+【訓練參數（來自 args.yaml）】
+
+Model: yolo12s.pt
+Epochs: 20
+Batch: 64
+Image size: 640
+Device: '0'
+Workers: 8
+Optimizer: AdamW
+Learning rate: 0.001
+
+（所有參數保留原始 args.yaml 設定）
+
+【MAE 整合】
+
+當前實作:
+- 使用標準 YOLO backbone
+- 可載入 MAE checkpoint 用於特徵初始化
+- MAE 是可選的增強功能
+
+未來擴展:
+- 完全替換 YOLO backbone 為 MAE encoder
+- 需要自定義 YOLO 架構
+- 參考 mae_yolo_backbone.py
+
+【預期訓練時間】
+
+根據配置（20 epochs, batch 64）:
+- 預計時間: 1-2 小時（取決於 GPU）
+- 每個 epoch: ~5-10 分鐘
+
+如果先訓練 MAE:
+- MAE 訓練: 3-5 小時
+- YOLO 訓練: 1-2 小時
+- 總計: 4-7 小時
+
+【故障排除】
+
+1. 資料集路徑錯誤
+   → 確認路徑存在: ls /DATA1/yunzhu/SSL/training_image/training_image
+
+2. 標註文件為空
+   → 需要手動標註，使用 LabelImg 等工具
+
+3. CUDA out of memory
+   → 降低 batch size (64 → 32 → 16)
+
+4. 找不到 ultralytics
+   → pip install ultralytics
+
+【下一步】
+
+1. ✅ 準備資料集
+2. ⚠️  添加標註（重要！）
+3. ✅ （可選）訓練 MAE
+4. ✅ 訓練 YOLO
+5. ⏳ 評估模型
+6. ⏳ 進行推論
+
+【相關文檔】
+
+詳細說明: YOLO_TRAINING_GUIDE.md
+MAE 訓練: README.md
+配置說明: configs.md
+
+================================================================================
+創建時間: 2025-11-03
+專案路徑: /DATA1/yunzhu/SSL/
+================================================================================

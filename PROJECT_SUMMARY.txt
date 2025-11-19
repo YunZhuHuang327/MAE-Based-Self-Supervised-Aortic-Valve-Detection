@@ -1,0 +1,162 @@
+================================================================================
+MAE 自監督學習專案總結
+Heart Valve Detection Pre-training with MAE
+================================================================================
+
+【專案目標】
+使用 Masked Autoencoder (MAE) 對心臟醫學影像進行自監督預訓練，
+為後續的心臟瓣膜偵測任務提供良好的特徵表示。
+
+【資料集】
+- 患者數量: 50
+- 總影像數: 14,076 張
+- 影像尺寸: 512×512 grayscale PNG
+- 平均影像/患者: 281.5 張
+
+【核心文件】
+1. mae_model.py          - MAE 模型（Encoder + Decoder）
+2. mae_dataset.py        - 資料載入與增強
+3. mae_train.py          - 訓練腳本
+4. mae_evaluate.py       - 評估與特徵提取
+5. analyze_dataset.py    - 資料集分析工具
+
+【執行腳本】
+- run_training_valve_optimized.sh  - 瓣膜偵測優化訓練（推薦）
+- run_evaluation_valve.sh          - 評估優化版模型
+- run_training.sh                  - 標準 MAE 訓練
+- run_evaluation.sh                - 評估標準模型
+
+【文檔】
+- README.md         - 完整使用說明
+- QUICK_START.md    - 快速開始指南
+- configs.md        - 配置詳解
+- requirements.txt  - 依賴套件
+
+【推薦配置（針對瓣膜偵測優化）】
+參數設定:
+  - Image size: 224×224
+  - Patch size: 16×16 (196 patches)
+  - Mask ratio: 0.65 ⭐ (降低以保留細節)
+  - Batch size: 128
+  - Learning rate: 1.5e-4 (實際 7.5e-5)
+  - Epochs: 200
+  - Warmup: 10 epochs
+
+訓練環境:
+  - GPU: 12GB+ VRAM (V100, RTX 3090, A100)
+  - 混合精度訓練 (--use_amp)
+  - 預計時間: 3-5 小時
+
+【為什麼這樣設定？】
+
+1. Mask Ratio = 0.65 (vs 標準 0.75)
+   → 保留 35% patches 而非 25%
+   → 更多局部細節，適合微小結構偵測
+
+2. Preserve Details = True
+   → 使用較溫和的資料增強
+   → 避免破壞心臟瓣膜等細微特徵
+
+3. Batch Size = 128
+   → 14,076 ÷ 128 = 109 iterations/epoch
+   → 平衡訓練穩定性與記憶體使用
+
+4. Learning Rate 縮放
+   → 基於 batch_size=256 的基準值
+   → 實際 LR = 1.5e-4 × (128/256) = 7.5e-5
+
+【快速開始】
+
+1. 安裝依賴:
+   pip install -r requirements.txt
+
+2. 訓練模型:
+   ./run_training_valve_optimized.sh
+
+3. 監控訓練:
+   tensorboard --logdir mae_valve_output/logs
+
+4. 評估模型:
+   ./run_evaluation_valve.sh
+
+5. 使用特徵:
+   features = np.load('mae_valve_evaluation/mae_features.npy')
+
+【輸出結果】
+
+訓練輸出 (mae_valve_output/):
+  - best_model.pth            - 最佳模型
+  - final_model.pth           - 最終模型
+  - checkpoint_epoch_*.pth    - 定期檢查點
+  - visualizations/           - 重建視覺化
+  - logs/                     - TensorBoard 日誌
+
+評估輸出 (mae_valve_evaluation/):
+  - mae_features.npy          - 特徵向量 (N×768)
+  - labels.npy                - 患者標籤
+  - embeddings_tsne.png       - t-SNE 視覺化
+  - embeddings_pca.png        - PCA 視覺化
+  - attention_maps/           - 注意力圖
+
+【下游應用】
+
+提取的特徵 (768 維) 可用於:
+
+1. 微調檢測模型
+   - 使用 encoder 作為 backbone
+   - 添加檢測頭 (detection head)
+   - 在標註資料上微調
+
+2. 線性探測 (Linear Probing)
+   - 凍結 encoder
+   - 只訓練線性分類器
+   - 評估特徵質量
+
+3. K-NN 分類
+   - 使用提取的特徵
+   - 基於相似度的分類
+
+【技術亮點】
+
+1. 針對醫學影像優化
+   - 灰階轉 RGB（相容 ViT）
+   - 較溫和的資料增強
+   - 保留細節的 mask ratio
+
+2. 高效訓練
+   - 混合精度訓練（節省 40% 記憶體）
+   - 只處理可見 patches
+   - Cosine 學習率衰減 + warmup
+
+3. 可視化支持
+   - 自動生成重建視覺化
+   - TensorBoard 整合
+   - t-SNE/PCA 特徵分析
+
+【與 SimCLR 的對比】
+
+| 特性 | MAE | SimCLR |
+|-----|-----|--------|
+| 學習方式 | 重建被遮蔽區域 | 對比兩個增強視圖 |
+| 資料增強 | 較溫和 | 激進（大範圍裁剪、色彩變化）|
+| 細節保留 | ✅ 好 | ⚠️ 可能損失 |
+| 小物體偵測 | ✅ 適合 | ❌ 較差 |
+| 訓練時間 | 較長 | 較快 |
+| 心臟瓣膜偵測 | ⭐ 推薦 | 不推薦 |
+
+【參考文獻】
+
+- He et al. "Masked Autoencoders Are Scalable Vision Learners" CVPR 2022
+- Dosovitskiy et al. "An Image is Worth 16x16 Words" ICLR 2021
+
+【聯絡資訊】
+
+如有問題，請參考:
+- README.md - 詳細文檔
+- configs.md - 配置說明
+- QUICK_START.md - 快速指南
+
+================================================================================
+創建時間: 2025-11-03
+專案路徑: /DATA1/yunzhu/SSL/
+================================================================================
