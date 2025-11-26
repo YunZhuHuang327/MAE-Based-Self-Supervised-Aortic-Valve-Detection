@@ -1,0 +1,11 @@
+# ============================================
+# YOLO Dataset Config (Minimal Version)
+# 自動生成於 C:\Users\OWNER\Downloads\aicup-aortic-valve-object-detection
+# ============================================
+
+path: C:\Users\OWNER\Downloads\aicup-aortic-valve-object-detection\datasets
+train: C:\Users\OWNER\Downloads\aicup-aortic-valve-object-detection\datasets\train\images
+val: C:\Users\OWNER\Downloads\aicup-aortic-valve-object-detection\datasets\val\images
+
+nc: 1
+names: ['aortic_valve']
